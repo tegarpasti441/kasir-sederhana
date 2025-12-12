@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aplikasi Kasir Cafe Sederhana</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f7f7f7;
+    }
+    h2 {
+      text-align: center;
+    }
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    label { display: block; margin-top: 10px; }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .row { display: flex; gap: 10px; }
+    .col { flex: 1; }
+    button {
+      margin-top: 15px;
+      padding: 10px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .btn-blue { background: #007bff; }
+    .btn-red { background: #dc3545; }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
+    td[contenteditable] { background: #fffbe6; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Input Pesanan Kasir Cafe</h2>
+
+    <div class="row">
+      <div class="col">
+        <label>Nama Menu</label>
+        <select id="menu">
+          <option value="Kopi Hitam" data-harga="15000">Kopi Hitam - 15.000</option>
+          <option value="Es Teh" data-harga="8000">Es Teh - 8.000</option>
+          <option value="Cappuccino" data-harga="20000">Cappuccino - 20.000</option>
+          <option value="Roti Bakar" data-harga="12000">Roti Bakar - 12.000</option>
+        </select>
+      </div>
+      <div style="width:130px">
+        <label>Jumlah</label>
+        <input type="number" id="jumlah" value="1" min="1" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <button onclick="tambahPesanan()">Tambah Pesanan</button>
+      </div>
+      <div style="width:180px">
+        <button class="btn-blue" onclick="exportExcel()">Export ke Excel</button>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Menu</th>
+          <th>Jumlah</th>
+          <th>Harga</th>
+          <th>Total</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="listPesanan"></tbody>
+    </table>
+
+    <h3 style="text-align:right">Total Bayar: <span id="totalBayar">0</span></h3>
+
+<h3>Metode Pembayaran</h3>
+<select id="metodeBayar" onchange="updateMetode()">
+  <option value="cash">Cash</option>
+  <option value="qris">QRIS</option>
+  <option value="debit">Debit</option>
+</select>
+
+<div id="cashSection" style="margin-top:10px; display:block;">
+  <label>Uang Diberikan</label>
+  <input type="number" id="uangDiberikan" oninput="hitungKembalian()" placeholder="Masukkan jumlah uang" />
+
+  <h3>Kembalian: <span id="kembalian">0</span></h3>
+</div>
+  </div>
+
+  <!-- library for Excel export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">function updateMetode() {
+  const metode = document.getElementById("metodeBayar").value;
+  const cashSection = document.getElementById("cashSection");
+
+  if (metode === "cash") {
+    cashSection.style.display = "block";
+  } else {
+    cashSection.style.display = "none";
+  }
+}
+
+function hitungKembalian() {
+  const uang = parseInt(document.getElementById("uangDiberikan").value || 0);
+  const total = totalBayar;
+  let kembali = uang - total;
+  if (kembali < 0) kembali = 0;
+  document.getElementById("kembalian").innerText = formatNumber(kembali);
+}
+
+</script>
+
+  <script>
+    // Single source of truth for total
+    let totalBayar = 0;
+
+    // Utility: format number with dot thousands (Indonesian style)
+    function formatNumber(n) {
+      return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    // Add a new order row (only one function, fixed)
+    function tambahPesanan() {
+      const menuSelect = document.getElementById("menu");
+      const menu = menuSelect.value;
+      const harga = parseInt(menuSelect.options[menuSelect.selectedIndex].getAttribute("data-harga"), 10) || 0;
+      const jumlahInput = document.getElementById("jumlah");
+      const jumlah = Math.max(1, parseInt(jumlahInput.value, 10) || 1);
+      const total = harga * jumlah;
+
+      const table = document.getElementById("listPesanan");
+      const row = document.createElement("tr");
+
+      // create cells with contenteditable jumlah and delete button
+      row.innerHTML = `
+        <td>${menu}</td>
+        <td contenteditable="true" oninput="updateRow(this)">${jumlah}</td>
+        <td>${formatNumber(harga)}</td>
+        <td>${formatNumber(total)}</td>
+        <td><button onclick="hapusRow(this)" class="btn-red">Hapus</button></td>
+      `;
+
+      table.appendChild(row);
+
+      // update totals
+      hitungTotal();
+
+      // reset jumlah input to 1 for convenience
+      jumlahInput.value = 1;
+    }
+
+    // Update row when jumlah edited (contenteditable cell)
+    function updateRow(cell) {
+      // only allow digits in the editable cell (remove non-digits)
+      const cleaned = cell.innerText.replace(/[^0-9]/g, '');
+      if (cleaned === '') {
+        cell.innerText = '1';
+      } else if (cleaned !== cell.innerText) {
+        // replace with cleaned value preserving caret may be lost but acceptable
+        cell.innerText = cleaned;
+      }
+
+      const row = cell.parentElement;
+      const jumlahBaru = Math.max(1, parseInt(cell.innerText, 10) || 1);
+      // harga is at index 2, but it's formatted with dots -> remove dots
+      const hargaText = row.children[2].innerText.replace(/\./g, '');
+      const harga = parseInt(hargaText, 10) || 0;
+      const total = jumlahBaru * harga;
+      row.children[3].innerText = formatNumber(total);
+
+      hitungTotal();
+    }
+
+    // Remove a row
+    function hapusRow(btn) {
+      const row = btn.parentElement.parentElement;
+      row.remove();
+      hitungTotal();
+    }
+
+    // Recalculate overall total
+    function hitungTotal() {
+      const table = document.getElementById("listPesanan");
+      let total = 0;
+      for (let row of table.rows) {
+        const cellText = row.children[3].innerText.replace(/\./g, '');
+        total += parseInt(cellText || '0', 10);
+      }
+      totalBayar = total;
+      document.getElementById("totalBayar").innerText = formatNumber(totalBayar);
+    }
+
+    // Export current table to Excel (works offline in-browser)
+    function exportExcel() {
+      const table = document.getElementById("listPesanan");
+      let data = [];
+      for (let row of table.rows) {
+        let rowData = [];
+        // convert formatted numbers back to plain numeric strings
+        rowData.push(row.children[0].innerText);
+        rowData.push(row.children[1].innerText);
+        rowData.push(row.children[2].innerText.replace(/\./g, ''));
+        rowData.push(row.children[3].innerText.replace(/\./g, ''));
+        data.push(rowData);
+      }
+
+      const sheetData = [["Menu", "Jumlah", "Harga (IDR)", "Total (IDR)"], ...data];
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Pesanan");
+      XLSX.writeFile(wb, "data_pesanan.xlsx");
+    }
+
+    // optional: keyboard shortcut Enter on jumlah input adds order
+    document.getElementById('jumlah').addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        tambahPesanan();
+      }
+    });
+  </script>
+</body>
+</html>
